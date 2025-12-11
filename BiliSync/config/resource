@@ -1,0 +1,40 @@
+{
+    "docker-project":
+    {
+        "projects":
+        [
+            {
+                "name": "bilisync",
+                "path": "docker"
+            }
+        ]
+    },
+    "data-share": {
+        "shares": [
+            {
+                "name": "bilisync",
+                "permission": {
+                    "rw": [
+                        "docker-bilisync"
+                    ]
+                }
+            },
+                        {
+                "name": "bilisync/config",
+                "permission": {
+                    "rw": [
+                        "docker-bilisync"
+                    ]
+                }
+            },
+            {
+                "name": "bilisync/videos",
+                "permission": {
+                    "rw": [
+                        "docker-bilisync"
+                    ]
+                }
+            }
+        ]
+    }
+}

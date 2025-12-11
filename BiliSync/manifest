@@ -1,0 +1,14 @@
+appname               = bilisync
+version               = 1.0.0
+display_name          = BiliSync
+desc                  = bili-sync 是一款专为 NAS 用户编写的哔哩哔哩同步工具，由 Rust & Tokio 驱动。
+arch                  = x86_64
+source                = thirdparty
+maintainer            = qq1582185982
+maintainer_url        = https://github.com/qq1582185982/bili-sync-01
+distributor           = liumingye
+distributor_url        = https://github.com/liumingye
+desktop_uidir         = ui
+desktop_applaunchname = bilisync.Application
+service_port          = 8045
+checksum              = cbae82169001f5c31f25765b05eeb150
