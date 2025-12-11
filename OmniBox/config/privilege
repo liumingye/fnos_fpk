@@ -1,0 +1,8 @@
+{
+    "defaults":
+    {
+        "run-as": "package"
+    },
+    "username": "docker-omnibox",
+    "groupname": "docker-omnibox"
+}

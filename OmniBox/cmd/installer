@@ -1,0 +1,34 @@
+#!/bin/bash
+
+
+# installer log is not writable, use for reference only.
+INST_LOG="/var/log/apps/${TRIM_APPNAME}.log"
+
+# Optional FWPORTS file
+FWPORTS_FILE="/var/apps/${TRIM_APPNAME}/etc/${TRIM_APPNAME}.sc"
+
+# Temporary directory when the package is upgrading
+TMP_DIR="${TRIM_TEMP_UPGRADE_FOLDER}"
+
+# Source installer variables and functions
+COMMON=$(dirname $0)"/common"
+echo ${COMMON}
+if [ -r "${COMMON}" ]; then
+    . "${COMMON}"
+fi
+
+
+# Source package specific variables and functions
+SVC_SETUP=$(dirname $0)"/service-setup"
+echo ${SVC_SETUP}
+if [ -r "${SVC_SETUP}" ]; then
+    . "${SVC_SETUP}"
+fi
+
+
+# Load (wizard) variables stored by postinst
+load_variables_from_file ${INST_VARIABLES}
+
+# init variables either from ${INST_VARIABLES}, from package or from wizard
+call_func "initialize_variables" install_log
+

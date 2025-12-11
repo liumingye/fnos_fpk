@@ -1,0 +1,32 @@
+{
+    "docker-project":
+    {
+        "projects":
+        [
+            {
+                "name": "omnibox",
+                "path": "docker"
+            }
+        ]
+    },
+    "data-share": {
+        "shares": [
+            {
+                "name": "omnibox",
+                "permission": {
+                    "rw": [
+                        "docker-omnibox"
+                    ]
+                }
+            },
+                        {
+                "name": "omnibox/data",
+                "permission": {
+                    "rw": [
+                        "docker-omnibox"
+                    ]
+                }
+            }
+        ]
+    }
+}
