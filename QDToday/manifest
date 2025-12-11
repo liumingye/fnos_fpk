@@ -1,0 +1,14 @@
+appname               = qdtoday
+version               = 1.0.0
+display_name          = QDToday
+desc                  = QD 是 一个 基于 HAR 编辑器和 Tornado 服务端的 HTTP 定时任务自动执行 Web 框架。
+arch                  = x86_64
+source                = thirdparty
+maintainer            = qd-today
+maintainer_url        = https://github.com/qd-today/qd
+distributor           = liumingye
+distributor_url        = https://github.com/liumingye
+desktop_uidir         = ui
+desktop_applaunchname = qdtoday.Application
+service_port          = 8923
+checksum              = 3ef9e371ada720e3cdc16d58c81d6616

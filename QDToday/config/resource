@@ -1,0 +1,32 @@
+{
+    "docker-project":
+    {
+        "projects":
+        [
+            {
+                "name": "qdtoday",
+                "path": "docker"
+            }
+        ]
+    },
+    "data-share": {
+        "shares": [
+            {
+                "name": "qdtoday",
+                "permission": {
+                    "rw": [
+                        "docker-qdtoday"
+                    ]
+                }
+            },
+                        {
+                "name": "qdtoday/config",
+                "permission": {
+                    "rw": [
+                        "docker-qdtoday"
+                    ]
+                }
+            }
+        ]
+    }
+}
