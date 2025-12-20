@@ -11,5 +11,5 @@ BASE_PKG="/var/apps/${TRIM_APPNAME}"
 ### ----------------------------------------
 
 service_postinst(){
-
+    true
 }
