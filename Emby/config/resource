@@ -1,0 +1,40 @@
+{
+    "docker-project":
+    {
+        "projects":
+        [
+            {
+                "name": "emby",
+                "path": "docker"
+            }
+        ]
+    },
+    "data-share": {
+        "shares": [
+            {
+                "name": "emby",
+                "permission": {
+                    "rw": [
+                        "docker-emby"
+                    ]
+                }
+            },
+            {
+                "name": "emby/config",
+                "permission": {
+                    "rw": [
+                        "docker-emby"
+                    ]
+                }
+            },
+            {
+                "name": "emby/videos",
+                "permission": {
+                    "rw": [
+                        "docker-emby"
+                    ]
+                }
+            }
+        ]
+    }
+}

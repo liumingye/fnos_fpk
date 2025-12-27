@@ -1,0 +1,475 @@
+#!/bin/bash
+# Tools shortcuts
+MV="/bin/mv -f"
+RM="/bin/rm -rf"
+CP="/bin/cp -rfp"
+MKDIR="/bin/mkdir -p"
+LN="/bin/ln -nsf"
+TEE="/usr/bin/tee -a"
+RSYNC="/bin/rsync -avh"
+TAR="/bin/tar"
+
+INST_ETC="/var/apps/${TRIM_APPNAME}/etc"
+INST_VARIABLES="${INST_ETC}/installer-variables"
+INST_LOG="/var/log/apps/${TRIM_APPNAME}.log"
+
+FWPORTS_FILE="/var/apps/${TRIM_APPNAME}/etc/${TRIM_APPNAME}.sc"
+SHARE_PATH="/var/apps/${TRIM_APPNAME}/shares/${TRIM_APPNAME}"
+
+LOG_FILE="${TRIM_PKGVAR}/${TRIM_APPNAME}.log"
+PID_FILE="${TRIM_PKGVAR}/${TRIM_APPNAME}.pid"
+
+SVC_WAIT_TIMEOUT=15
+
+
+#执行目录
+SVC_CWD="${TRIM_PKGVAR}"
+
+#是否后台执行
+SVC_BACKGROUND=y
+
+#是否写入PID文件
+SVC_WRITE_PID=y
+
+#是否输出日志
+SVC_QUIET=y
+DOCKER_NAME=""
+
+DNAME="${TRIM_APPNAME}"
+
+#输出是否重定向
+SVC_NO_REDIRECT=""
+
+#重定向配置决定输出目标
+OUT=/dev/null
+if [ -n "${SVC_NO_REDIRECT}" ]; then
+  OUT="/dev/null"
+else
+  OUT="${LOG_FILE}"
+fi
+
+#函数占位
+validate_preinst()
+{
+echo "validate_preinst"
+}
+service_preinst()
+{
+echo "service_preinst"
+}
+service_postinst()
+{
+echo "service_postinst"
+}
+service_preuninst()
+{
+echo "service_preuninst"
+}
+service_postuninst()
+{
+echo "service_postuninst"
+}
+validate_preupgrade()
+{
+echo "validate_preupgrade"
+}
+service_preupgrade()
+{
+echo "service_preupgrade"
+}
+service_save()
+{
+echo "service_save"
+}
+service_restore()
+{
+echo "service_restore"
+}
+service_postupgrade()
+{
+echo "service_postupgrade"
+}
+
+
+
+check_docker()
+{
+
+	FILE_PATH="${TRIM_APPDEST}/docker/docker-compose.yaml"
+
+	if [ -f "$FILE_PATH" ]; then
+		DOCKER_NAME=$(cat $FILE_PATH | grep "container_name" | awk -F ':' '{print $2}' | xargs)
+		echo "DOCKER_NAME is set to: $DOCKER_NAME"
+	fi
+
+}
+
+#初始化Docker name
+check_docker
+
+
+
+install_log ()
+{
+    local _msg_="$@"
+    if [ -z "${_msg_}" ]; then
+        # read multiline from stdin
+        while IFS=$'\n' read -r line; do
+            install_log "${line}"
+        done
+    else
+        # stderr goes to /var/log/packages/{package}.log
+        # stdout goes to dialog in package manager ui.
+        echo -e "$(date +'%Y/%m/%d %H:%M:%S')\t${_msg_}" 1>&2
+    fi
+}
+
+
+#执行指定函数
+call_func ()
+{
+    FUNC=$1
+    LOG=$2
+    if type "${FUNC}" 2>/dev/null | grep -q 'function' 2>/dev/null; then
+		if [ -n "${LOG}" ]; then
+			install_log "Begin ${FUNC}"
+			eval ${FUNC} 2>&1 | ${LOG}
+			install_log "End ${FUNC}"
+		else
+			echo "Begin ${FUNC}" >> ${LOG_FILE}
+			eval ${FUNC}         >> ${LOG_FILE}
+			echo "End ${FUNC}"   >> ${LOG_FILE}
+		fi
+    fi
+}
+
+get_key_value()
+{
+        CONFIG_FILE=$1
+        KEY=$2
+        value=$(cat $CONFIG_FILE | grep -F "${KEY}" | awk -F "=" '{print $2}' | tr -d ' ' | tr -d '"')
+        echo $value
+}
+
+
+install_python_virtualenv ()
+{
+    python3 --version
+
+    python3 -m venv --system-site-packages ${TRIM_APPDEST}/env
+
+    python3 -m pip install --upgrade pip
+
+}
+
+
+install_python_wheels ()
+{
+    # default PATH to wheelhouse
+    cachedir=${TRIM_PKGVAR}/pip-cache
+    wheelhouse=${TRIM_APPDEST}/share/wheelhouse
+    requirements=${wheelhouse}/requirements.txt
+
+    # Install the wheels
+    echo "Install packages from wheels"
+    if [ -s ${requirements} ]; then
+       echo "Install packages from wheels [${requirements}]"
+       pip install $([ $# -gt 0 ] && echo $*) \
+                   --force-reinstall \
+                   --cache-dir ${cachedir} \
+                   --find-links ${wheelhouse} \
+                   --requirement ${requirements}
+    fi
+
+    echo "Installed modules:"
+    pip freeze
+}
+
+
+log_step ()
+{
+    install_log "===> Step $1. STATUS=${TRIM_APP_STATUS} USER=$USER GROUP=$GROUP SHARE_PATH=${SHARE_PATH}"
+}
+
+
+initialize_variables ()
+{
+    # Expect user to be set from package specific variables
+    if [ -n "${USER}" -a -z "${USER_DESC}" ]; then
+        USER_DESC="User running ${TRIM_APPNAME}"
+    fi
+
+    # Default description if group name provided by UI
+    if [ -n "${GROUP}" -a -z "${GROUP_DESC}" ]; then
+        GROUP_DESC="${TRIM_APPNAME} Package Group"
+    fi
+
+    # Extract share volume and share name from download location if provided
+    if [ -n "${SHARE_PATH}" ]; then
+        if [ -n "${wizard_volume}" ]; then
+            SHARE_PATH="${wizard_volume}/${SHARE_PATH}"
+        fi
+        SHARE_VOLUME=$(echo "${SHARE_PATH}" | awk -F/ '{print "/"$2}')
+        SHARE_NAME=$(echo "${SHARE_PATH}" | awk -F/ '{print $3}')
+    fi
+}
+
+
+
+
+load_variables_from_file ()
+{
+   if [ -n "$1" -a -r "$1" ]; then
+      while read -r _line; do
+        if [ "$(echo ${_line} | grep -v ^[/s]*#)" != "" ]; then
+           _key="$(echo ${_line} | cut --fields=1 --delimiter==)"
+           _value="$(echo ${_line} | cut --fields=2- --delimiter==)"
+           export "${_key}=${_value}"
+        fi
+      done < "$1"
+   fi
+}
+
+
+save_wizard_variables ()
+{
+    if [ -e "${INST_VARIABLES}" ]; then
+        $RM "${INST_VARIABLES}"
+    fi
+    if [ -n "${GROUP}" ]; then
+        echo "GROUP=${GROUP}" >> ${INST_VARIABLES}
+    fi
+    if [ -n "${SHARE_PATH}" ]; then
+        echo "SHARE_PATH=${SHARE_PATH}" >> ${INST_VARIABLES}
+    fi
+}
+
+sync_var_folder () {
+    if [ -d ${TRIM_APPDEST}/var -a "$(ls -A ${TRIM_APPDEST}/var 2>/dev/null)" ]; then
+    
+        echo "Install files from var folder"
+    
+        # Move all files except existing
+        echo "$RSYNC --ignore-existing --remove-source-files ${TRIM_APPDEST}/var/ ${TRIM_PKGVAR}"
+        $RSYNC --ignore-existing --remove-source-files ${TRIM_APPDEST}/var/ ${TRIM_PKGVAR}
+
+        find ${TRIM_APPDEST}/var -type f -exec sh -c 'x="{}"; mv "$x" "${x}.new"' \;
+
+        echo "$RSYNC --remove-source-files ${TRIM_APPDEST}/var/ ${TRIM_PKGVAR}"
+        $RSYNC --remove-source-files ${TRIM_APPDEST}/var/ ${TRIM_PKGVAR}
+
+        $RM ${TRIM_APPDEST}/var
+    fi
+}
+
+
+install_init ()
+{
+    log_step "install_init"
+    call_func "validate_preinst" install_log
+    call_func "service_preinst" install_log
+
+    
+
+    exit 0
+}
+
+install_callback ()
+{
+    log_step "install_callback"
+    call_func "save_wizard_variables" install_log
+    sync_var_folder
+    call_func "service_postinst" install_log
+
+    if [ -n "${LOG_FILE}" ]; then
+        echo "Installation log: ${INST_LOG}" >> ${LOG_FILE}
+    fi
+	
+
+    exit 0
+}
+
+uninstall_init ()
+{
+    log_step "uninstall_init"
+    call_func "service_preuninst" install_log
+    exit 0
+}
+
+
+uninstall_callback ()
+{
+    log_step "uninstall_callback"
+    call_func "service_postuninst" install_log
+
+    if [ "$wizard_delete_data" = "true" ]; then
+        echo "Removing files..." | install_log
+        if [ "$(ls -A ${TRIM_PKGHOME})" != "" ]; then
+            find ${TRIM_PKGHOME} -mindepth 1 -delete -print | install_log
+        fi
+
+        if [ "$(ls -A ${TRIM_PKGVAR})" != "" ]; then
+            find ${TRIM_PKGVAR} -mindepth 1 -delete -print | install_log
+        fi
+
+        if [ "$(ls -A /var/apps/${TRIM_APPNAME}/etc)" != "" ]; then
+            find /var/apps/${TRIM_APPNAME}/etc -mindepth 1 -delete -print | install_log
+        fi
+    fi
+    exit 0
+}
+
+
+upgrade_init ()
+{
+    log_step "upgrade_init"
+    call_func "validate_preupgrade"  install_log
+
+    if [ -d ${TRIM_PKGDEST}/var ]; then
+            if [ -d ${TRIM_PKGDEST}/var -a "$(ls -A ${TRIM_PKGDEST}/var 2>/dev/null)" ]; then
+                echo "$RSYNC ${TRIM_PKGDEST}/var/ ${TRIM_PKGTMP}" | install_log
+                $RSYNC ${TRIM_PKGDEST}/var/ ${TRIM_PKGTMP} 2>&1 | install_log
+
+                rm -rf ${TRIM_PKGDEST}/var 2>&1 | install_log
+            fi
+    fi
+	call_func "service_preupgrade" install_log
+    call_func "service_save" install_log
+    exit 0
+}
+
+upgrade_callback ()
+{
+    log_step "upgrade_callback"
+    call_func "service_restore" install_log
+    call_func "service_postupgrade" install_log
+	
+	if [ -d ${TRIM_PKGTMP} -a "$(ls -A ${TRIM_PKGTMP} 2>/dev/null)" ]; then
+        echo "$RSYNC ${TRIM_PKGTMP}/ ${TRIM_PKGVAR}" | install_log
+        $RSYNC ${TRIM_PKGTMP}/ ${TRIM_PKGVAR} 2>&1 | install_log
+    fi
+
+    exit 0
+}
+
+
+
+
+trim_sync_var_folder () {
+    if [ -d ${TRIM_APPDEST}/var -a "$(ls -A ${TRIM_APPDEST}/var 2>/dev/null)" ]; then
+    
+        echo "Install files from var folder"
+    fi
+}
+
+
+
+
+
+start_daemon ()
+{
+	if [ -n "$DOCKER_NAME" ]; then
+        echo "DOCKER_NAME is set to '$DOCKER_NAME', exiting function."
+        return
+    fi
+    i=0
+    if [ -z "${SVC_QUIET}" ]; then
+        if [ -z "${SVC_KEEP_LOG}" ]; then
+            date > ${LOG_FILE}
+        else
+            date >> ${LOG_FILE}
+        fi
+    fi
+    call_func "service_prestart"
+    printf "%s" "$SERVICE_COMMAND" | while read -r service || [ -n "$service" ]
+    do
+        i=$((i + 1))
+        if [ -z "${SVC_QUIET}" ]; then
+            echo "Starting ${DNAME} command ${service}" >> ${LOG_FILE}
+        fi
+        if [ -n "${service}" ]; then 
+            if [ -n "${SVC_CWD}" ]; then
+                cd ${SVC_CWD}
+            fi
+                
+            if [ -z "${SVC_BACKGROUND}" ]; then
+                ${service} >> ${OUT} 2>&1
+            else
+                ${service} >> ${OUT} 2>&1 &
+            fi    
+            if [ -n "${SVC_WRITE_PID}" -a -n "${SVC_BACKGROUND}" -a -n "${PID_FILE}" ]; then
+                 [ $i -eq 1 ] && printf "%s" "$!" > ${PID_FILE} || printf "\n%s" "$!" >> ${PID_FILE}
+            else
+                wait_for_status 0 ${SVC_WAIT_TIMEOUT:=20}
+            fi
+        fi
+    done
+}
+
+stop_daemon ()
+{
+	if [ -n "$DOCKER_NAME" ]; then
+        echo "DOCKER_NAME is set to '$DOCKER_NAME', exiting function."
+        return
+    fi
+    if [ -n "${PID_FILE}" -a -r "${PID_FILE}" ]; then
+        for pid in $(cat "${PID_FILE}")
+        do
+            if [ -z "$pid" ]; then
+              continue
+            fi
+            if [ -z "${SVC_QUIET}" ]; then
+                date >> ${LOG_FILE}
+                echo "Stopping ${DNAME} service : $(ps -p${pid} -o comm=) (${pid})" >> ${LOG_FILE}
+            fi
+            kill -TERM ${pid} >> ${LOG_FILE} 2>&1
+            wait_for_status 1 ${SVC_WAIT_TIMEOUT:=20} ${pid} || kill -KILL ${pid} >> ${LOG_FILE} 2>&1
+        done
+        if [ -f "${PID_FILE}" ]; then
+            rm -f "${PID_FILE}" > /dev/null
+        fi
+    fi
+    call_func "service_poststop"
+}
+
+
+daemon_status ()
+{
+	if [ -n "$DOCKER_NAME" ]; then
+        docker inspect $DOCKER_NAME | grep -q "\"Status\": \"running\"," || exit 1
+        return
+    fi	
+    status=0
+    [ -z "${1}" ] && pid_list=$(cat ${PID_FILE} 2>/dev/null) || pid_list=${1}
+    if [ -n "${pid_list}" ]; then
+        for pid in ${pid_list}
+        do
+           kill -0 ${pid} > /dev/null 2>&1
+           status=$((status + $?))
+        done
+        if [ $status -ne 0 ]; then
+           rm -f "${PID_FILE}" > /dev/null
+           return 1
+        else
+           return 0
+        fi
+    else
+        return 1
+    fi
+}
+
+
+wait_for_status ()
+{
+    # default value: 20 seconds
+    counter=${2}
+    counter=${counter:=20}
+    while [ ${counter} -gt 0 ]; do
+        daemon_status ${3}
+        [ $? -eq $1 ] && return
+        counter=$((counter - 1))
+        sleep 1
+    done
+    return 1
+}
+

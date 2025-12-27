@@ -1,0 +1,14 @@
+appname               = emby
+version               = 1.0.0
+display_name          = Emby
+desc                  = Emby破解版，EmbyServer是一款软件媒体系统，可让您控制媒体的管理和流式传输。可以通过多个应用程序将专用服务器中的媒体提供给最终用户设备。
+arch                  = x86_64
+source                = thirdparty
+maintainer            = amilys
+maintainer_url        = https://hub.docker.com/r/amilys/embyserver
+distributor           = liumingye
+distributor_url        = https://github.com/liumingye
+desktop_uidir         = ui
+desktop_applaunchname = emby.Application
+service_port          = 8096
+checksum              = 81c63d9314e575b71343b154525cf992
