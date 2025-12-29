@@ -11,4 +11,4 @@ distributor_url        = https://github.com/liumingye
 desktop_uidir         = ui
 desktop_applaunchname = emby.Application
 service_port          = 8096
-checksum              = 81c63d9314e575b71343b154525cf992
+checksum              = bdc9a31d569e990b6810e97b88542f49
