@@ -1,0 +1,34 @@
+version: '3.3'
+services:
+  moviepilot:
+    stdin_open: true
+    tty: true
+    container_name: moviepilot-v2
+    hostname: moviepilot-v2
+    ports:
+      - '5300:3000'
+      - '5301:3001'
+    volumes:
+      - './config:/config'
+      - './core:/moviepilot/.cache/ms-playwright'
+      - '/var/apps/qBittorrent/target/qBittorrent_conf/data/BT_backup:/qb'
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+    environment:
+      - 'NGINX_PORT=3000'
+      - 'PORT=3001'
+      - 'PUID=0'
+      - 'PGID=0'
+      - 'UMASK=000'
+      - 'TZ=Asia/Shanghai'
+      - 'SUPERUSER=admin'
+      - 'SUPERUSER_PASSWORD=123456'
+    restart: always
+    image: jxxghp/moviepilot-v2:latest
+    labels:
+      watchcow.enable: "true"
+      watchcow.display_name: "MoviePilot"
+      watchcow.desc: "基于 NAStool 部分代码重新设计，聚焦自动化核心需求，减少问题同时更易于扩展和维护。"
+      watchcow.service_port: "5300"
+      watchcow.protocol: "http"
+      watchcow.path: "/"
+      watchcow.icon: "https://gh-proxy.org/https://raw.githubusercontent.com/liumingye/fnos_fpk/refs/heads/main/icon/moviepilot.png"
